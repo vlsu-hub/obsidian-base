@@ -1,0 +1,15 @@
+ul.section-ul ul.tags a {  
+  padding: 0.05rem 0.3rem !important;
+  opacity: 0.45 !important;
+  max-width: 140px !important;
+  
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important; 
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+ul.section-ul ul.tags a:hover {
+  opacity: 1 !important; 
+}
