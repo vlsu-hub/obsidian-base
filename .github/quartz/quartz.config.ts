@@ -1,5 +1,5 @@
-import { QuartzConfig } from "./quartz/cfg"
-import * as Plugin from "./quartz/plugins"
+import { QuartzConfig } from "./quartz/cfg";
+import * as Plugin from "./quartz/plugins";
 
 /**
  * Конфигурация Quartz 4.5+
@@ -12,7 +12,7 @@ const config: QuartzConfig = {
     enablePopovers: true,
     analytics: null,
     locale: "ru-RU",
-    baseUrl: "the-nataraja/obsidian-base",
+    baseUrl: "vlsu-hub.github.io/obsidian-base",
     ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"],
     defaultDateType: "created",
     generateSocialImages: false,
@@ -77,17 +77,17 @@ const config: QuartzConfig = {
       Plugin.ContentPage(),
       Plugin.FolderPage({
         sort: (f1, f2) => {
-          const title1 = f1.frontmatter?.title ?? f1.file!.stem
-          const title2 = f2.frontmatter?.title ?? f2.file!.stem
-          return title1.localeCompare(title2, undefined, { numeric: true }) 
-        }
+          const title1 = f1.frontmatter?.title ?? f1.file!.stem;
+          const title2 = f2.frontmatter?.title ?? f2.file!.stem;
+          return title1.localeCompare(title2, undefined, { numeric: true });
+        },
       }),
       Plugin.TagPage({
         sort: (f1, f2) => {
-          const title1 = f1.frontmatter?.title ?? f1.file!.stem
-          const title2 = f2.frontmatter?.title ?? f2.file!.stem
-          return title1.localeCompare(title2, undefined, { numeric: true })
-        }
+          const title1 = f1.frontmatter?.title ?? f1.file!.stem;
+          const title2 = f2.frontmatter?.title ?? f2.file!.stem;
+          return title1.localeCompare(title2, undefined, { numeric: true });
+        },
       }),
       Plugin.ContentIndex({
         enableSiteMap: true,
@@ -98,6 +98,6 @@ const config: QuartzConfig = {
       Plugin.NotFoundPage(),
     ],
   },
-}
+};
 
-export default config
+export default config;
