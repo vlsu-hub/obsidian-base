@@ -12,7 +12,7 @@ const config: QuartzConfig = {
     enablePopovers: true,
     analytics: null,
     locale: "ru-RU",
-    baseUrl: "vlsu-hub.github.io/obsidian-base",
+    baseUrl: "the-nataraja/obsidian-base",
     ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"],
     defaultDateType: "created",
     generateSocialImages: false,
@@ -75,8 +75,20 @@ const config: QuartzConfig = {
       Plugin.AliasRedirects(),
       Plugin.ComponentResources(),
       Plugin.ContentPage(),
-      Plugin.FolderPage(),
-      Plugin.TagPage(),
+      Plugin.FolderPage({
+        sort: (f1, f2) => {
+          const title1 = f1.frontmatter?.title ?? f1.file!.stem
+          const title2 = f2.frontmatter?.title ?? f2.file!.stem
+          return title1.localeCompare(title2, undefined, { numeric: true }) 
+        }
+      }),
+      Plugin.TagPage({
+        sort: (f1, f2) => {
+          const title1 = f1.frontmatter?.title ?? f1.file!.stem
+          const title2 = f2.frontmatter?.title ?? f2.file!.stem
+          return title1.localeCompare(title2, undefined, { numeric: true })
+        }
+      }),
       Plugin.ContentIndex({
         enableSiteMap: true,
         enableRSS: true,
