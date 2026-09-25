@@ -1,16 +1,21 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
 
+/**
+ * Конфигурация Quartz 4.5+
+ */
 const config: QuartzConfig = {
   configuration: {
     pageTitle: "База знаний",
+    pageTitleSuffix: "",
     enableSPA: true,
     enablePopovers: true,
     analytics: null,
-    locale: "ru-RU", 
-    baseUrl: "the-nataraja.github.io/your-test-repo", // ВАЖНО: при тестировании укажи тут путь тестового репозитория
-    ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"], // <-- Игнорируем Dataview скрипты нативно
+    locale: "ru-RU",
+    baseUrl: "your-username.github.io/obsidian-test", // Не забудь про имя своего репозитория
+    ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"],
     defaultDateType: "created",
+    generateSocialImages: false,
     theme: {
       fontOrigin: "googleFonts",
       cdnCaching: true,
@@ -21,25 +26,41 @@ const config: QuartzConfig = {
       },
       colors: {
         lightMode: {
-          light: "#faf8f8", lightgray: "#e5e5e5", gray: "#b8b8b8", darkgray: "#4e4e4e", dark: "#2b2b2b", secondary: "#284b63", tertiary: "#84a59d", highlight: "rgba(143, 159, 169, 0.15)",
+          light: "#faf8f8",
+          lightgray: "#e5e5e5",
+          gray: "#b8b8b8",
+          darkgray: "#4e4e4e",
+          dark: "#2b2b2b",
+          secondary: "#284b63",
+          tertiary: "#84a59d",
+          highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#fff23688",
         },
         darkMode: {
-          light: "#161618", lightgray: "#393639", gray: "#646464", darkgray: "#d4d4d4", dark: "#ebebec", secondary: "#7b97aa", tertiary: "#84a59d", highlight: "rgba(143, 159, 169, 0.15)",
+          light: "#161618",
+          lightgray: "#393639",
+          gray: "#646464",
+          darkgray: "#d4d4d4",
+          dark: "#ebebec",
+          secondary: "#7b97aa",
+          tertiary: "#84a59d",
+          highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#b3aa0288",
         },
       },
     },
   },
   plugins: {
-    components: [
-      Plugin.ComponentResources(),
-      Plugin.ComponentStyles(),
-    ],
     transformers: [
       Plugin.FrontMatter(),
-      Plugin.CreatedModifiedDate({ priority: ["frontmatter", "filesystem"] }),
-      Plugin.Latex({ renderEngine: "mathjax" }), // MathJax для сложных формул
+      Plugin.CreatedModifiedDate({
+        priority: ["frontmatter", "filesystem"],
+      }),
       Plugin.SyntaxHighlighting({
-        theme: { light: "github-light", dark: "github-dark" },
+        theme: {
+          light: "github-light",
+          dark: "github-dark",
+        },
         keepBackground: false,
       }),
       Plugin.ObsidianFlavoredMarkdown({ enableInHtmlEmbed: false }),
@@ -47,17 +68,19 @@ const config: QuartzConfig = {
       Plugin.TableOfContents(),
       Plugin.CrawlLinks({ markdownLinkResolution: "shortest" }),
       Plugin.Description(),
+      Plugin.Latex({ renderEngine: "mathjax" }), // Наш MathJax на месте
     ],
-    filters: [
-      Plugin.RemoveDrafts(), // Оставляем только стандартный фильтр
-    ],
+    filters: [Plugin.RemoveDrafts()],
     emitters: [
       Plugin.AliasRedirects(),
-      Plugin.ComponentResources(),
+      Plugin.ComponentResources(), // Теперь он один отвечает за все стили и скрипты компонентов
       Plugin.ContentPage(),
       Plugin.FolderPage(),
       Plugin.TagPage(),
-      Plugin.ContentIndex({ enableSiteMap: true, enableRSS: true }),
+      Plugin.ContentIndex({
+        enableSiteMap: true,
+        enableRSS: true,
+      }),
       Plugin.Assets(),
       Plugin.Static(),
       Plugin.NotFoundPage(),
