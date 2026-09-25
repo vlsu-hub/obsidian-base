@@ -8,7 +8,7 @@ const config: QuartzConfig = {
     enablePopovers: true,
     analytics: null,
     locale: "ru-RU", 
-    baseUrl: "your-username.github.io/your-test-repo", // ВАЖНО: при тестировании укажи тут путь тестового репозитория
+    baseUrl: "the-nataraja.github.io/your-test-repo", // ВАЖНО: при тестировании укажи тут путь тестового репозитория
     ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"], // <-- Игнорируем Dataview скрипты нативно
     defaultDateType: "created",
     theme: {
