@@ -8,9 +8,34 @@ import yaml
 ALLOWED_PREFIXES = ["КП", "ЛБ", "ПР", "ЭКЗ"]
 ALLOWED_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
 ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"}
+MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 
 MAX_FILE_SIZE_MB = 10
 WARNING_FILES = [".gitignore", "contributing.md"]
+
+
+def has_unclosed_code_blocks(text):
+    in_block = False
+    fence_char = ""
+    fence_len = 0
+
+    for line in text.splitlines():
+        line_clean = line.strip()
+        if not in_block:
+            match = re.match(r"^(`{3,}|~{3,})", line_clean)
+            if match:
+                in_block = True
+                fence_str = match.group(1)
+                fence_char = fence_str[0]
+                fence_len = len(fence_str)
+        else:
+            match = re.match(r"^(`{3,}|~{3,})$", line_clean)
+            if match:
+                fence_str = match.group(1)
+                if fence_str[0] == fence_char and len(fence_str) >= fence_len:
+                    in_block = False
+
+    return in_block
 
 
 def check_file(filepath):
@@ -20,26 +45,36 @@ def check_file(filepath):
     filename = os.path.basename(filepath)
     ext = os.path.splitext(filename)[1].lower()
 
-    if filename in WARNING_FILES:
-        warnings.append(
-            f"::warning title=Изменен системный файл::Обратите внимание на изменение {filepath}"
-        )
-
     file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
     if file_size_mb > MAX_FILE_SIZE_MB:
         errors.append(
             f"[{filename}] Превышен размер файла: {file_size_mb:.2f} МБ (лимит {MAX_FILE_SIZE_MB} МБ)."
         )
 
+    warning_files_lower = {f.lower() for f in WARNING_FILES}
+    if filename.lower() in warning_files_lower:
+        warnings.append(
+            f"::warning title=Изменен системный файл::Обратите внимание на изменение {filepath}"
+        )
+        return errors, warnings
+
     if ext not in ALLOWED_EXTENSIONS:
         errors.append(f"[{filename}] Недопустимое расширение '{ext}'.")
         return errors, warnings
 
-    if ext != ".md":
+    path_parts = PurePosixPath(filepath).parts
+
+    if ext in MEDIA_EXTENSIONS:
+        if any("семестр" in p.lower() for p in path_parts):
+            dir_parts = [p.lower() for p in path_parts[:-1]]
+            if "attachments" not in dir_parts and "_attachments" not in dir_parts:
+                errors.append(
+                    f"[{filepath}] Медиафайлы в папках семестров должны находиться внутри папки 'attachments/'."
+                )
         return errors, warnings
 
-    # Git diff всегда возвращает пути с прямым слэшем (независимо от ОС)
-    path_parts = PurePosixPath(filepath).parts
+    if ext != ".md":
+        return errors, warnings
 
     if len(path_parts) > 1 and "семестр" in path_parts[0].lower():
         if len(path_parts) >= 4:
@@ -77,39 +112,81 @@ def check_file(filepath):
     yaml_match = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n(.*)", content, re.DOTALL)
     if not yaml_match:
         errors.append(f"[{filename}] Отсутствует или повреждена YAML шапка.")
-    else:
-        yaml_text, body_text = yaml_match.groups()
+        return errors, warnings
 
-        try:
-            metadata = yaml.safe_load(yaml_text) or {}
+    yaml_text, body_text = yaml_match.groups()
 
-            if "date" not in metadata:
-                errors.append(f"[{filename}] Отсутствует поле 'date'.")
-            elif not re.match(r"^\d{4}-\d{2}-\d{2}$", str(metadata.get("date", ""))):
+    try:
+        metadata = yaml.safe_load(yaml_text) or {}
+
+        if "date" not in metadata:
+            errors.append(f"[{filename}] Отсутствует поле 'date'.")
+        elif not re.match(r"^\d{4}-\d{2}-\d{2}$", str(metadata.get("date", ""))):
+            errors.append(f"[{filename}] Поле 'date' должно быть в формате YYYY-MM-DD.")
+
+        tags = metadata.get("tags", [])
+        if not tags or not isinstance(tags, list):
+            errors.append(f"[{filename}] Отсутствует массив 'tags'.")
+        else:
+            has_author = any(str(tag).startswith("author/") for tag in tags)
+            has_typer = any(str(tag).startswith("typer/") for tag in tags)
+            if not has_author:
                 errors.append(
-                    f"[{filename}] Поле 'date' должно быть в формате YYYY-MM-DD."
+                    f"[{filename}] Отсутствует обязательный тег 'author/username'."
                 )
+            if not has_typer:
+                errors.append(
+                    f"[{filename}] Отсутствует обязательный тег 'typer/username'."
+                )
+    except yaml.YAMLError:
+        errors.append(f"[{filename}] Синтаксическая ошибка в YAML.")
 
-            tags = metadata.get("tags", [])
-            if not tags or not isinstance(tags, list):
-                errors.append(f"[{filename}] Отсутствует массив 'tags'.")
-            else:
-                has_author = any(str(tag).startswith("author/") for tag in tags)
-                if not has_author:
-                    errors.append(
-                        f"[{filename}] Отсутствует обязательный тег 'author/username'."
-                    )
-        except yaml.YAMLError:
-            errors.append(f"[{filename}] Синтаксическая ошибка в YAML.")
+    if has_unclosed_code_blocks(body_text):
+        errors.append(f"[{filename}] Обнаружен незакрытый блок кода.")
 
-        # Вырезаем блоки кода для предотвращения ложных срабатываний парсера тегов
-        clean_body = re.sub(r"```.*?```", "", body_text, flags=re.DOTALL)
-        clean_body = re.sub(r"`.*?`", "", clean_body)
+    clean_body = re.sub(r"```.*?```", "", body_text, flags=re.DOTALL)
+    clean_body = re.sub(r"~~~.*?~~~", "", clean_body, flags=re.DOTALL)
+    clean_body = re.sub(r"`.*?`", "", clean_body)
 
-        body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_-]+", clean_body)
-        for tag in body_tags:
-            if tag.lower() not in ALLOWED_TAGS:
-                errors.append(f"[{filename}] Запрещенный тег '{tag}' в теле документа.")
+    if not re.search(r"[a-zA-Zа-яА-Я0-9]", clean_body):
+        errors.append(f"[{filename}] Файл не содержит текста конспекта.")
+
+    if re.search(r"^[ ]{0,3}#[ \t]+\S", clean_body, flags=re.MULTILINE):
+        errors.append(
+            f"[{filename}] Запрещено использовать заголовок первого уровня '# Заголовок'. Используйте '##'."
+        )
+
+    links = re.findall(r"!?\[.*?\]\((.*?)\)", clean_body)
+    wiki_links = re.findall(r"!?\[\[(.*?)\]\]", clean_body)
+
+    for raw_link in links:
+        target = raw_link.strip().split()[0].strip("<>")
+        if (
+            target.startswith("file://")
+            or re.match(r"^[a-zA-Z]:[/\\]", target)
+            or re.match(r"^/(Users|home|root|tmp)/", target)
+            or target.startswith(r"\\")
+        ):
+            errors.append(
+                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
+            )
+
+    for raw_link in wiki_links:
+        target = raw_link.strip().split("|")[0].strip()
+        if (
+            target.startswith("file://")
+            or re.match(r"^[a-zA-Z]:[/\\]", target)
+            or re.match(r"^/(Users|home|root|tmp)/", target)
+            or target.startswith(r"\\")
+        ):
+            errors.append(
+                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
+            )
+
+    body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_-]+", clean_body)
+    for tag in body_tags:
+        if tag.lower() not in ALLOWED_TAGS:
+            errors.append(f"[{filename}] Запрещенный тег '{tag}' в теле документа.")
 
     return errors, warnings
 
