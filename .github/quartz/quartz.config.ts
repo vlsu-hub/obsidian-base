@@ -12,7 +12,7 @@ const config: QuartzConfig = {
     enablePopovers: true,
     analytics: null,
     locale: "ru-RU",
-    baseUrl: "your-username.github.io/obsidian-test", // Не забудь про имя своего репозитория
+    baseUrl: "the-nataraja.github.io/obsidian-test",
     ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"],
     defaultDateType: "created",
     generateSocialImages: false,
@@ -68,12 +68,12 @@ const config: QuartzConfig = {
       Plugin.TableOfContents(),
       Plugin.CrawlLinks({ markdownLinkResolution: "shortest" }),
       Plugin.Description(),
-      Plugin.Latex({ renderEngine: "mathjax" }), // Наш MathJax на месте
+      Plugin.Latex({ renderEngine: "mathjax" }),
     ],
     filters: [Plugin.RemoveDrafts()],
     emitters: [
       Plugin.AliasRedirects(),
-      Plugin.ComponentResources(), // Теперь он один отвечает за все стили и скрипты компонентов
+      Plugin.ComponentResources(),
       Plugin.ContentPage(),
       Plugin.FolderPage(),
       Plugin.TagPage(),
