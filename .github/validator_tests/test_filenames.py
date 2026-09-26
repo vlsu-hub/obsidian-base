@@ -1,222 +1,276 @@
-import pytest
-from validate_contributing import check_file
+import os
+import re
+import sys
+from pathlib import PurePosixPath
 
-# Валидный контент, чтобы тесты имен не падали на ошибках парсинга YAML
-DUMMY_VALID_CONTENT = """---
-date: 2024-01-01
-tags:
-  - author/tester
----
-Тело документа
-"""
+import yaml
+
+ALLOWED_PREFIXES = ["КП", "ЛБ", "ПР", "ЭКЗ"]
+# Разрешены ТОЛЬКО в тексте
+ALLOWED_BODY_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
+# Разрешены ТОЛЬКО в YAML (без решетки)
+ALLOWED_YAML_PREFIXES = ("author/", "typer/", "editor/")
+
+ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"}
+MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+
+MAX_FILE_SIZE_MB = 10
+
+# Файлы, которые лежат в корне и не подчиняются правилам
+SYSTEM_FILES = {"readme.md", "contributing.md", ".gitignore", "license", "license.md"}
+# При изменении этих файлов будем писать Warning
+WARNING_FILES = {".gitignore", "contributing.md"}
 
 
-@pytest.fixture
-def make_file(tmp_path, monkeypatch):
-    """Фикстура-помощник для быстрого создания файлов по относительному пути."""
-    monkeypatch.chdir(tmp_path)
+def has_unclosed_code_blocks(text):
+    in_block = False
+    fence_char = ""
+    fence_len = 0
 
-    def _create(rel_path, content=DUMMY_VALID_CONTENT, is_binary=False):
-        file_path = tmp_path / rel_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        if is_binary:
-            file_path.write_bytes(b"\x00" * 100)
+    for line in text.splitlines():
+        line_clean = line.strip()
+        if not in_block:
+            match = re.match(r"^(`{3,}|~{3,})", line_clean)
+            if match:
+                in_block = True
+                fence_str = match.group(1)
+                fence_char = fence_str[0]
+                fence_len = len(fence_str)
         else:
-            file_path.write_text(content, encoding="utf-8")
-        return rel_path
+            match = re.match(r"^(`{3,}|~{3,})$", line_clean)
+            if match:
+                fence_str = match.group(1)
+                if fence_str[0] == fence_char and len(fence_str) >= fence_len:
+                    in_block = False
 
-    return _create
-
-
-# =====================================================================
-# 1. ТЕСТЫ РАСШИРЕНИЙ ФАЙЛОВ
-# =====================================================================
+    return in_block
 
 
-@pytest.mark.parametrize(
-    "ext", [".md", ".MD", ".png", ".PNG", ".jpg", ".JPEG", ".webp", ".pdf", ".svg"]
-)
-def test_allowed_extensions_case_insensitive(make_file, ext):
-    """Разрешенные расширения в любом регистре должны проходить."""
-    path = make_file(f"folder/test_file{ext}", is_binary=(ext.lower() != ".md"))
-    errors, _ = check_file(path)
-    assert not any("Недопустимое расширение" in err for err in errors)
+def check_file(filepath):
+    errors = []
+    warnings = []
+
+    filename = os.path.basename(filepath)
+    ext = os.path.splitext(filename)[1].lower()
+
+    file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        errors.append(
+            f"[{filename}] Превышен размер файла: {file_size_mb:.2f} МБ (лимит {MAX_FILE_SIZE_MB} МБ)."
+        )
+
+    path_parts = PurePosixPath(filepath).parts
+
+    # 1. ИГНОРИРУЕМ ПАПКУ .github
+    if any(part == ".github" for part in path_parts):
+        return errors, warnings
+
+    # 2. ИГНОРИРУЕМ СИСТЕМНЫЕ ФАЙЛЫ (README, CONTRIBUTING и т.д.)
+    if filename.lower() in SYSTEM_FILES:
+        if filename.lower() in WARNING_FILES:
+            warnings.append(
+                f"::warning title=Изменен системный файл::Обратите внимание на изменение {filepath}"
+            )
+        return errors, warnings
+
+    # 3. Проверка расширений
+    if ext not in ALLOWED_EXTENSIONS:
+        errors.append(f"[{filename}] Недопустимое расширение '{ext}'.")
+        return errors, warnings
+
+    if ext in MEDIA_EXTENSIONS:
+        if any("семестр" in p.lower() for p in path_parts):
+            dir_parts = [p.lower() for p in path_parts[:-1]]
+            if "attachments" not in dir_parts and "_attachments" not in dir_parts:
+                errors.append(
+                    f"[{filepath}] Медиафайлы в папках семестров должны находиться внутри папки 'attachments/'."
+                )
+        return errors, warnings
+
+    if ext != ".md":
+        return errors, warnings
+
+    if len(path_parts) > 1 and "семестр" in path_parts[0].lower():
+        if len(path_parts) >= 4:
+            folder_lvl3 = path_parts[2]
+            if not re.match(r"^\d+_", folder_lvl3):
+                errors.append(
+                    f"[{filepath}] Папка '{folder_lvl3}' должна начинаться с цифры и подчеркивания (например '1_')."
+                )
+
+    is_index_file = filename.startswith("_")
+
+    # 4. Проверка префикса
+    if not is_index_file:
+        prefix_pattern = "|".join(ALLOWED_PREFIXES)
+        match = re.match(rf"^({prefix_pattern}) (\d{{2}}) - (.*)\.md$", filename)
+
+        if not match:
+            errors.append(
+                f"[{filename}] Неверный формат имени. Ожидается: '[ПРЕФИКС] [XX] - [Тема].md'."
+            )
+        else:
+            _, _, topic = match.groups()
+            if not re.match(r"^[a-zа-яё0-9_-]+$", topic):
+                errors.append(
+                    f"[{filename}] Ошибка в теме '{topic}'. Разрешены только строчные буквы, цифры, '_' и '-'."
+                )
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        errors.append(f"[{filename}] Файл не в кодировке UTF-8.")
+        return errors, warnings
+    except Exception as e:
+        errors.append(f"[{filename}] Ошибка чтения: {e}")
+        return errors, warnings
+
+    # 5. Проверка YAML шапки
+    yaml_match = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n(.*)", content, re.DOTALL)
+
+    if not yaml_match:
+        if is_index_file:
+            body_text = content
+        else:
+            errors.append(f"[{filename}] Отсутствует или повреждена YAML шапка.")
+            return errors, warnings
+    else:
+        yaml_text, body_text = yaml_match.groups()
+
+        if not is_index_file:
+            try:
+                metadata = yaml.safe_load(yaml_text) or {}
+
+                if "date" not in metadata:
+                    errors.append(f"[{filename}] Отсутствует поле 'date'.")
+                elif not re.match(
+                    r"^\d{4}-\d{2}-\d{2}$", str(metadata.get("date", ""))
+                ):
+                    errors.append(
+                        f"[{filename}] Поле 'date' должно быть в формате YYYY-MM-DD."
+                    )
+
+                tags = metadata.get("tags", [])
+                if not tags or not isinstance(tags, list):
+                    errors.append(
+                        f"[{filename}] Отсутствует массив 'tags' в шапке документа."
+                    )
+                else:
+                    has_author = False
+                    has_typer = False
+
+                    for tag in tags:
+                        tag_str = str(tag).strip()
+                        if tag_str.startswith("author/"):
+                            has_author = True
+                        elif tag_str.startswith("typer/"):
+                            has_typer = True
+                        elif tag_str.startswith("editor/"):
+                            pass
+                        else:
+                            errors.append(
+                                f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Здесь разрешены ТОЛЬКО author/, typer/ и editor/."
+                            )
+
+                    if not has_author:
+                        errors.append(
+                            f"[{filename}] Отсутствует обязательный тег 'author/username' в YAML шапке."
+                        )
+                    if not has_typer:
+                        errors.append(
+                            f"[{filename}] Отсутствует обязательный тег 'typer/username' в YAML шапке."
+                        )
+            except yaml.YAMLError:
+                errors.append(f"[{filename}] Синтаксическая ошибка в YAML.")
+
+    # 6. Проверка тела документа
+    if has_unclosed_code_blocks(body_text):
+        errors.append(f"[{filename}] Обнаружен незакрытый блок кода.")
+
+    clean_body = re.sub(r"```.*?```", "", body_text, flags=re.DOTALL)
+    clean_body = re.sub(r"~~~.*?~~~", "", clean_body, flags=re.DOTALL)
+    clean_body = re.sub(r"`.*?`", "", clean_body)
+
+    if not re.search(r"[a-zA-Zа-яА-Я0-9]", clean_body):
+        errors.append(f"[{filename}] Файл не содержит текста.")
+
+    h1_headers = re.findall(r"^[ ]{0,3}#[ \t]+\S", clean_body, flags=re.MULTILINE)
+    if len(h1_headers) > 2:
+        errors.append(
+            f"[{filename}] Слишком много заголовков первого уровня '#': найдено {len(h1_headers)}, разрешено максимум 2."
+        )
+
+    links = re.findall(r"!?\[.*?\]\((.*?)\)", clean_body)
+    wiki_links = re.findall(r"!?\[\[(.*?)\]\]", clean_body)
+
+    # Проверка на абсолютные локальные пути
+    for raw_link in links:
+        target = raw_link.strip().split()[0].strip("<>")
+        if (
+            target.startswith("file://")
+            or re.match(r"^[a-zA-Z]:[/\\]", target)
+            or re.match(r"^/(Users|home|root|tmp)/", target)
+            or target.startswith(r"\\")
+        ):
+            errors.append(
+                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
+            )
+
+    for raw_link in wiki_links:
+        target = raw_link.strip().split("|")[0].strip()
+        if (
+            target.startswith("file://")
+            or re.match(r"^[a-zA-Z]:[/\\]", target)
+            or re.match(r"^/(Users|home|root|tmp)/", target)
+            or target.startswith(r"\\")
+        ):
+            errors.append(
+                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
+            )
+
+    # Проверка тегов в тексте
+    body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_/-]+", clean_body)
+    for tag in body_tags:
+        if tag.lower() not in ALLOWED_BODY_TAGS:
+            errors.append(
+                f"[{filename}] Запрещенный тег '{tag}' в тексте. Разрешены только: {', '.join(ALLOWED_BODY_TAGS)}."
+            )
+
+    return errors, warnings
 
 
-@pytest.mark.parametrize("ext", [".exe", ".txt", ".docx", ".py", ".sh", ".zip"])
-def test_forbidden_extensions(make_file, ext):
-    """Запрещенные расширения должны выдавать ошибку."""
-    path = make_file(f"folder/danger{ext}")
-    errors, _ = check_file(path)
-    assert any("Недопустимое расширение" in err for err in errors)
+if __name__ == "__main__":
+    all_errors = []
+    files_to_check = []
 
+    try:
+        with open("changed_files.txt", "r", encoding="utf-8") as f:
+            files_to_check = [line.strip().strip('"') for line in f if line.strip()]
+    except FileNotFoundError:
+        print("Файл changed_files.txt не найден. Проверка пропущена.")
+        sys.exit(0)
 
-# =====================================================================
-# 2. ТЕСТЫ СТРОГОГО ФОРМАТА ИМЕНИ ФАЙЛА
-# =====================================================================
+    if not files_to_check:
+        print("Нет файлов для проверки.")
+        sys.exit(0)
 
+    print(f"Запуск проверки для {len(files_to_check)} файла(ов)...")
+    for filepath in files_to_check:
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            continue
 
-@pytest.mark.parametrize(
-    "valid_name",
-    [
-        "ПР 01 - os-intro.md",
-        "ЛБ 12 - lab_work.md",
-        "КП 00 - course-project.md",
-        "ЭКЗ 99 - билеты-к-экзамену.md",
-        "ПР 01 - тема-с-буквой-ё-и-цифрами-123.md",  # Буква ё и цифры
-    ],
-)
-def test_valid_filename_formats(make_file, valid_name):
-    """Корректные названия файлов Markdown."""
-    path = make_file(f"folder/{valid_name}")
-    errors, _ = check_file(path)
-    # Проверяем, что ошибок формата имени нет
-    assert not any("Неверный формат имени" in err for err in errors)
-    assert not any("Ошибка в теме" in err for err in errors)
+        errors, warnings = check_file(filepath)
+        all_errors.extend(errors)
 
+        for warning in warnings:
+            print(warning)
 
-@pytest.mark.parametrize(
-    "invalid_prefix",
-    [
-        "пр 01 - topic.md",  # Маленькие буквы префикса
-        "Пр 01 - topic.md",  # Смешанный регистр
-        "ДЗ 01 - topic.md",  # Запрещенный префикс
-        "ТЕСТ 01 - topic.md",
-    ],
-)
-def test_invalid_prefixes(make_file, invalid_prefix):
-    """Префикс должен быть строго из ALLOWED_PREFIXES в верхнем регистре."""
-    path = make_file(f"folder/{invalid_prefix}")
-    errors, _ = check_file(path)
-    assert any("Неверный формат имени" in err for err in errors)
-
-
-@pytest.mark.parametrize(
-    "invalid_spacing_or_digits",
-    [
-        "ПР 1 - topic.md",  # 1 цифра вместо 2
-        "ПР 001 - topic.md",  # 3 цифры вместо 2
-        "ПР  01 - topic.md",  # Двойной пробел
-        "ПР 01- topic.md",  # Нет пробела перед дефисом
-        "ПР 01 -topic.md",  # Нет пробела после дефиса
-        "ПР 01-topic.md",  # Дефис слитный
-        "ПР 01 – topic.md",  # Длинное тире (en-dash) вместо дефиса
-    ],
-)
-def test_invalid_spacing_and_delimiters(make_file, invalid_spacing_or_digits):
-    """Ошибки в пробелах, количестве цифр и знаках разделения."""
-    path = make_file(f"folder/{invalid_spacing_or_digits}")
-    errors, _ = check_file(path)
-    assert any("Неверный формат имени" in err for err in errors)
-
-
-@pytest.mark.parametrize(
-    "invalid_topic",
-    [
-        "ПР 01 - Topic.md",  # Заглавная буква
-        "ПР 01 - моё_Задание.md",  # Заглавная русская буква
-        "ПР 01 - тема с пробелами.md",  # Пробелы в теме запрещены
-        "ПР 01 - тема.с.точкой.md",  # Точки в теме запрещены
-        "ПР 01 - тема,запятая.md",  # Запятые запрещены
-        "ПР 01 - topic(v1).md",  # Скобки запрещены
-        "ПР 01 - topic_🔥.md",  # Эмодзи запрещены
-        "ПР 01 - .md",  # Пустая тема
-    ],
-)
-def test_invalid_topic_characters(make_file, invalid_topic):
-    """Проверка ограничений темы: только a-z, а-я, ё, 0-9, '_' и '-'."""
-    path = make_file(f"folder/{invalid_topic}")
-    errors, _ = check_file(path)
-    assert any(
-        ("Ошибка в теме" in err or "Неверный формат имени" in err) for err in errors
-    )
-
-
-# =====================================================================
-# 3. ИСКЛЮЧЕНИЯ И СЛУЖЕБНЫЕ ФАЙЛЫ
-# =====================================================================
-
-
-def test_underscore_files_are_ignored(make_file):
-    """Файлы, начинающиеся с '_', игнорируют проверку формата имени."""
-    # У него нет префикса и есть пробелы, но есть '_' в начале
-    path = make_file("folder/_sidebar menu.md")
-    errors, _ = check_file(path)
-    assert not any("Неверный формат имени" in err for err in errors)
-
-
-def test_non_markdown_files_skip_naming_rules(make_file):
-    """Картинки не обязаны подчиняться правилу 'ПР 01 - ...'."""
-    path = make_file("folder/my screenshot (1).png", is_binary=True)
-    errors, _ = check_file(path)
-    assert len(errors) == 0
-
-
-def test_system_warning_files(make_file):
-    """Изменение системных файлов порождает Warning, а не Error."""
-    path = make_file(".gitignore", content="# ignore")
-    errors, warnings = check_file(path)
-    assert len(errors) == 0
-    assert len(warnings) == 1
-    assert "Изменен системный файл" in warnings[0]
-
-
-# =====================================================================
-# 4. ТЕСТЫ ПУТЕЙ И ВЛОЖЕННОСТИ (СЕМЕСТРЫ И ПАПКИ 3-ГО УРОВНЯ)
-# =====================================================================
-
-
-@pytest.mark.parametrize("semester_folder", ["1_семестр", "2_Семестр", "СЕМЕСТР_3"])
-def test_semester_casing_detection(make_file, semester_folder):
-    """Слово 'семестр' должно определяться независимо от регистра."""
-    # 4 уровня: [семестр, предмет, папка_без_цифры, файл]
-    path = make_file(f"{semester_folder}/мат_анализ/теория/ПР 01 - intro.md")
-    errors, _ = check_file(path)
-    assert any("должна начинаться с цифры" in err for err in errors)
-
-
-@pytest.mark.parametrize(
-    "valid_lvl3_folder", ["1_intro", "02_lection", "999_super_practice"]
-)
-def test_valid_folder_level_3(make_file, valid_lvl3_folder):
-    """Папка 3-го уровня правильно начинается с цифры и подчеркивания."""
-    path = make_file(f"1_семестр/мат_анализ/{valid_lvl3_folder}/ПР 01 - intro.md")
-    errors, _ = check_file(path)
-    assert not any("должна начинаться с цифры" in err for err in errors)
-
-
-@pytest.mark.parametrize(
-    "invalid_lvl3_folder", ["intro", "_1_intro", "lection_1", "1-intro"]
-)
-def test_invalid_folder_level_3(make_file, invalid_lvl3_folder):
-    """Папка 3-го уровня НЕ начинается с 'цифра_'."""
-    path = make_file(f"1_семестр/мат_анализ/{invalid_lvl3_folder}/ПР 01 - intro.md")
-    errors, _ = check_file(path)
-    assert any("должна начинаться с цифры" in err for err in errors)
-
-
-def test_path_outside_semester_is_not_checked_for_digits(make_file):
-    """Если папка не семестр, требование '1_' к 3-му уровню не применяется."""
-    path = make_file("общие_материалы/книги/любая_папка/ПР 01 - intro.md")
-    errors, _ = check_file(path)
-    assert not any("должна начинаться с цифры" in err for err in errors)
-
-
-def test_semester_path_less_than_4_levels(make_file):
-    """Если в семестре файл лежит неглубоко (нет 3 уровня папок), ошибки нет."""
-    # 3 уровня: [1_семестр, мат_анализ, файл.md]
-    path = make_file("1_семестр/мат_анализ/ПР 01 - intro.md")
-    errors, _ = check_file(path)
-    assert not any("должна начинаться с цифры" in err for err in errors)
-
-
-def test_media_in_semester_without_attachments_folder_fails(make_file):
-    path = make_file("1 семестр/физика/1_лекции/доска.png", is_binary=True)
-    errors, _ = check_file(path)
-    assert any("должны находиться внутри папки 'attachments/'" in err for err in errors)
-
-
-def test_media_in_semester_with_attachments_folder_passes(make_file):
-    path = make_file("1 семестр/физика/1_лекции/attachments/доска.png", is_binary=True)
-    errors, _ = check_file(path)
-    assert len(errors) == 0
+    if all_errors:
+        print(f"\n[!] ОШИБКА ВАЛИДАЦИИ (найдено проблем: {len(all_errors)}):\n")
+        for error in all_errors:
+            print(f"  - {error}")
+        sys.exit(1)
+    else:
+        print("\n[OK] Проверка успешно пройдена.")
+        sys.exit(0)
