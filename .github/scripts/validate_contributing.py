@@ -6,7 +6,11 @@ from pathlib import PurePosixPath
 import yaml
 
 ALLOWED_PREFIXES = ["КП", "ЛБ", "ПР", "ЭКЗ"]
-ALLOWED_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
+# Разрешены ТОЛЬКО в тексте
+ALLOWED_BODY_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
+# Разрешены ТОЛЬКО в YAML (без решетки)
+ALLOWED_YAML_PREFIXES = ("author/", "typer/", "editor/")
+
 ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"}
 MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 
@@ -126,17 +130,29 @@ def check_file(filepath):
 
         tags = metadata.get("tags", [])
         if not tags or not isinstance(tags, list):
-            errors.append(f"[{filename}] Отсутствует массив 'tags'.")
+            errors.append(f"[{filename}] Отсутствует массив 'tags' в шапке документа.")
         else:
-            has_author = any(str(tag).startswith("author/") for tag in tags)
-            has_typer = any(str(tag).startswith("typer/") for tag in tags)
+            has_author = False
+            has_typer = False
+            
+            for tag in tags:
+                tag_str = str(tag).strip()
+                if tag_str.startswith("author/"):
+                    has_author = True
+                elif tag_str.startswith("typer/"):
+                    has_typer = True
+                elif tag_str.startswith("editor/"):
+                    pass # Разрешено, ничего не делаем
+                else:
+                    errors.append(f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Здесь разрешены ТОЛЬКО author/, typer/ и editor/.")
+
             if not has_author:
                 errors.append(
-                    f"[{filename}] Отсутствует обязательный тег 'author/username'."
+                    f"[{filename}] Отсутствует обязательный тег 'author/username' в YAML шапке."
                 )
             if not has_typer:
                 errors.append(
-                    f"[{filename}] Отсутствует обязательный тег 'typer/username'."
+                    f"[{filename}] Отсутствует обязательный тег 'typer/username' в YAML шапке."
                 )
     except yaml.YAMLError:
         errors.append(f"[{filename}] Синтаксическая ошибка в YAML.")
@@ -184,10 +200,11 @@ def check_file(filepath):
                 f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
             )
 
-    body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_-]+", clean_body)
+    # Ищем теги в тексте (с учетом слэша, чтобы ловить тех, кто пишет #author/ник в тексте)
+    body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_/-]+", clean_body)
     for tag in body_tags:
-        if tag.lower() not in ALLOWED_TAGS:
-            errors.append(f"[{filename}] Запрещенный тег '{tag}' в теле документа.")
+        if tag.lower() not in ALLOWED_BODY_TAGS:
+            errors.append(f"[{filename}] Запрещенный тег '{tag}' в тексте. В теле документа разрешены только: {', '.join(ALLOWED_BODY_TAGS)}.")
 
     return errors, warnings
 
