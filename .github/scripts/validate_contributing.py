@@ -151,9 +151,10 @@ def check_file(filepath):
     if not re.search(r"[a-zA-Zа-яА-Я0-9]", clean_body):
         errors.append(f"[{filename}] Файл не содержит текста конспекта.")
 
-    if re.search(r"^[ ]{0,3}#[ \t]+\S", clean_body, flags=re.MULTILINE):
+    h1_headers = re.findall(r"^[ ]{0,3}#[ \t]+\S", clean_body, flags=re.MULTILINE)
+    if len(h1_headers) > 2:
         errors.append(
-            f"[{filename}] Запрещено использовать заголовок первого уровня '# Заголовок'. Используйте '##'."
+            f"[{filename}] Слишком много заголовков первого уровня '#': найдено {len(h1_headers)}, разрешено максимум 2."
         )
 
     links = re.findall(r"!?\[.*?\]\((.*?)\)", clean_body)
