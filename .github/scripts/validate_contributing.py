@@ -6,9 +6,7 @@ from pathlib import PurePosixPath
 import yaml
 
 ALLOWED_PREFIXES = ["КП", "ЛБ", "ПР", "ЭКЗ"]
-# Разрешены ТОЛЬКО в тексте
 ALLOWED_BODY_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
-# Разрешены ТОЛЬКО в YAML (без решетки)
 ALLOWED_YAML_PREFIXES = ("author/", "typer/", "editor/")
 
 ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"}
@@ -45,6 +43,10 @@ def has_unclosed_code_blocks(text):
 def check_file(filepath):
     errors = []
     warnings = []
+    path_parts = PurePosixPath(filepath.replace("\\", "/")).parts
+
+    if ".github" in path_parts:
+        return errors, warnings
 
     filename = os.path.basename(filepath)
     ext = os.path.splitext(filename)[1].lower()
@@ -65,8 +67,6 @@ def check_file(filepath):
     if ext not in ALLOWED_EXTENSIONS:
         errors.append(f"[{filename}] Недопустимое расширение '{ext}'.")
         return errors, warnings
-
-    path_parts = PurePosixPath(filepath).parts
 
     if ext in MEDIA_EXTENSIONS:
         if any("семестр" in p.lower() for p in path_parts):
@@ -134,7 +134,7 @@ def check_file(filepath):
         else:
             has_author = False
             has_typer = False
-            
+
             for tag in tags:
                 tag_str = str(tag).strip()
                 if tag_str.startswith("author/"):
@@ -142,9 +142,11 @@ def check_file(filepath):
                 elif tag_str.startswith("typer/"):
                     has_typer = True
                 elif tag_str.startswith("editor/"):
-                    pass # Разрешено, ничего не делаем
+                    pass
                 else:
-                    errors.append(f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Здесь разрешены ТОЛЬКО author/, typer/ и editor/.")
+                    errors.append(
+                        f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Здесь разрешены ТОЛЬКО author/, typer/ и editor/."
+                    )
 
             if not has_author:
                 errors.append(
@@ -200,11 +202,12 @@ def check_file(filepath):
                 f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
             )
 
-    # Ищем теги в тексте (с учетом слэша, чтобы ловить тех, кто пишет #author/ник в тексте)
     body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_/-]+", clean_body)
     for tag in body_tags:
         if tag.lower() not in ALLOWED_BODY_TAGS:
-            errors.append(f"[{filename}] Запрещенный тег '{tag}' в тексте. В теле документа разрешены только: {', '.join(ALLOWED_BODY_TAGS)}.")
+            errors.append(
+                f"[{filename}] Запрещенный тег '{tag}' в тексте. В теле документа разрешены только: {', '.join(ALLOWED_BODY_TAGS)}."
+            )
 
     return errors, warnings
 
