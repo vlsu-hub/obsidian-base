@@ -15,7 +15,7 @@ const config: QuartzConfig = {
     baseUrl: "notes.vlsu-hub.org/",
     ignorePatterns: ["private", "templates", ".obsidian", "**/_*.md"],
     defaultDateType: "created",
-    generateSocialImages: false,
+    generateSocialImages: true,
     theme: {
       fontOrigin: "googleFonts",
       cdnCaching: true,

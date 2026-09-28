@@ -1,5 +1,5 @@
-import { PageLayout, SharedLayout } from "./quartz/cfg"
-import * as Component from "./quartz/components"
+import { PageLayout, SharedLayout } from "./quartz/cfg";
+import * as Component from "./quartz/components";
 
 export const sharedPageComponents: SharedLayout = {
   head: Component.Head(),
@@ -7,10 +7,12 @@ export const sharedPageComponents: SharedLayout = {
   afterBody: [],
   footer: Component.Footer({
     links: {
-      GitHub: "https://github.com/jackyzha0/quartz",
+      "Главная страница": "https://vlsu-hub.org",
+      Telegram: "https://t.me/the_nataraja",
+      GitHub: "https://github.com/vlsu-hub/obsidian-base",
     },
   }),
-}
+};
 
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
@@ -24,27 +26,39 @@ export const defaultContentPageLayout: PageLayout = {
     Component.MobileOnly(Component.Spacer()),
     Component.Search(),
     Component.Darkmode(),
-    Component.DesktopOnly(Component.Explorer()),
+    Component.Explorer({
+      title: "Навигация",
+      useSavedState: true,
+      folderClickBehavior: "collapse",
+      folderDefaultState: "collapsed",
+    }),
   ],
   right: [
     Component.Graph(),
-    Component.DesktopOnly(Component.TableOfContents()),
+    Component.TableOfContents({
+      layout: "modern",
+    }),
     Component.Backlinks(),
   ],
-}
+};
 
 export const defaultListPageLayout: PageLayout = {
   beforeBody: [
-    Component.Breadcrumbs(), 
-    Component.ArticleTitle(), 
-    Component.ContentMeta({ showReadingTime: false })
+    Component.Breadcrumbs(),
+    Component.ArticleTitle(),
+    Component.ContentMeta({ showReadingTime: false }),
   ],
   left: [
     Component.PageTitle(),
     Component.MobileOnly(Component.Spacer()),
     Component.Search(),
     Component.Darkmode(),
-    Component.DesktopOnly(Component.Explorer()),
+    Component.Explorer({
+      title: "Навигация",
+      useSavedState: true,
+      folderClickBehavior: "collapse",
+      folderDefaultState: "collapsed",
+    }),
   ],
   right: [],
-}
+};
