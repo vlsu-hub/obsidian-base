@@ -2,19 +2,19 @@ import os
 import re
 import sys
 from pathlib import PurePosixPath
-
 import yaml
 
 ALLOWED_PREFIXES = ["КП", "ЛБ", "ПР", "ЭКЗ"]
 ALLOWED_BODY_TAGS = ["#экзамен", "#важно", "#дописать", "#вопрос"]
 ALLOWED_YAML_PREFIXES = ("author/", "typer/", "editor/")
 
-ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf"}
-MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".pdf", ".avif"}
+MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".avif"}
+
+IGNORE_DIRS = {".github", ".git", ".obsidian", ".venv", "venv"}
 
 MAX_FILE_SIZE_MB = 10
 WARNING_FILES = [".gitignore", "contributing.md"]
-
 
 def has_unclosed_code_blocks(text):
     in_block = False
@@ -39,13 +39,15 @@ def has_unclosed_code_blocks(text):
 
     return in_block
 
-
 def check_file(filepath):
     errors = []
     warnings = []
     path_parts = PurePosixPath(filepath.replace("\\", "/")).parts
 
-    if ".github" in path_parts:
+    if any(part in IGNORE_DIRS for part in path_parts):
+        return errors, warnings
+
+    if any(re.match(r"^4_", part) for part in path_parts):
         return errors, warnings
 
     filename = os.path.basename(filepath)
@@ -53,15 +55,11 @@ def check_file(filepath):
 
     file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
     if file_size_mb > MAX_FILE_SIZE_MB:
-        errors.append(
-            f"[{filename}] Превышен размер файла: {file_size_mb:.2f} МБ (лимит {MAX_FILE_SIZE_MB} МБ)."
-        )
+        errors.append(f"[{filename}] Превышен размер файла: {file_size_mb:.2f} МБ (лимит {MAX_FILE_SIZE_MB} МБ).")
 
     warning_files_lower = {f.lower() for f in WARNING_FILES}
     if filename.lower() in warning_files_lower:
-        warnings.append(
-            f"::warning title=Изменен системный файл::Обратите внимание на изменение {filepath}"
-        )
+        warnings.append(f"::warning title=Изменен системный файл::Обратите внимание на изменение {filepath}")
         return errors, warnings
 
     if ext not in ALLOWED_EXTENSIONS:
@@ -72,36 +70,40 @@ def check_file(filepath):
         if any("семестр" in p.lower() for p in path_parts):
             dir_parts = [p.lower() for p in path_parts[:-1]]
             if "attachments" not in dir_parts and "_attachments" not in dir_parts:
-                errors.append(
-                    f"[{filepath}] Медиафайлы в папках семестров должны находиться внутри папки 'attachments/'."
-                )
+                errors.append(f"[{filepath}] Медиафайлы в папках семестров должны находиться внутри папки 'attachments/' или '_attachments/'.")
         return errors, warnings
 
     if ext != ".md":
         return errors, warnings
 
     if len(path_parts) > 1 and "семестр" in path_parts[0].lower():
-        if len(path_parts) >= 4:
-            folder_lvl3 = path_parts[2]
-            if not re.match(r"^\d+_", folder_lvl3):
-                errors.append(
-                    f"[{filepath}] Папка '{folder_lvl3}' должна начинаться с цифры и подчеркивания (например '1_')."
-                )
+        for i in range(2, len(path_parts) - 1): 
+            folder_name = path_parts[i]
+            if folder_name.lower() in ("attachments", "_attachments"):
+                continue
+            
+            if not re.match(r"^\d+_", folder_name):
+                errors.append(f"[{filepath}] Папка '{folder_name}' должна начинаться с цифры и подчеркивания (например '1_').")
 
     if not filename.startswith("_"):
+        is_valid_name = False
+        
         prefix_pattern = "|".join(ALLOWED_PREFIXES)
-        match = re.match(rf"^({prefix_pattern}) (\d{{2}}) - (.*)\.md$", filename)
+        match_standard = re.match(rf"^({prefix_pattern}) (\d{{2}}) - (.*)\.md$", filename)
+        
+        match_ticket = re.match(r"^\d+ билет\.md$", filename.lower())
 
-        if not match:
-            errors.append(
-                f"[{filename}] Неверный формат имени. Ожидается: '[ПРЕФИКС] [XX] - [Тема].md'."
-            )
-        else:
-            _, _, topic = match.groups()
+        if match_standard:
+            _, _, topic = match_standard.groups()
             if not re.match(r"^[a-zа-яё0-9_-]+$", topic):
-                errors.append(
-                    f"[{filename}] Ошибка в теме '{topic}'. Разрешены только строчные буквы, цифры, '_' и '-'."
-                )
+                errors.append(f"[{filename}] Ошибка в теме '{topic}'. Разрешены только строчные буквы, цифры, '_' и '-'.")
+            else:
+                is_valid_name = True
+        elif match_ticket:
+            is_valid_name = True
+            
+        if not is_valid_name and not match_standard:
+            errors.append(f"[{filename}] Неверный формат имени. Ожидается: '[ПРЕФИКС] [XX] - [Тема].md' ИЛИ 'X билет.md'.")
 
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -144,18 +146,12 @@ def check_file(filepath):
                 elif tag_str.startswith("editor/"):
                     pass
                 else:
-                    errors.append(
-                        f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Здесь разрешены ТОЛЬКО author/, typer/ и editor/."
-                    )
+                    errors.append(f"[{filename}] Недопустимый тег '{tag_str}' в YAML шапке. Разрешены ТОЛЬКО author/, typer/ и editor/.")
 
             if not has_author:
-                errors.append(
-                    f"[{filename}] Отсутствует обязательный тег 'author/username' в YAML шапке."
-                )
+                errors.append(f"[{filename}] Отсутствует обязательный тег 'author/username' в YAML шапке.")
             if not has_typer:
-                errors.append(
-                    f"[{filename}] Отсутствует обязательный тег 'typer/username' в YAML шапке."
-                )
+                errors.append(f"[{filename}] Отсутствует обязательный тег 'typer/username' в YAML шапке.")
     except yaml.YAMLError:
         errors.append(f"[{filename}] Синтаксическая ошибка в YAML.")
 
@@ -171,43 +167,25 @@ def check_file(filepath):
 
     h1_headers = re.findall(r"^[ ]{0,3}#[ \t]+\S", clean_body, flags=re.MULTILINE)
     if len(h1_headers) > 2:
-        errors.append(
-            f"[{filename}] Слишком много заголовков первого уровня '#': найдено {len(h1_headers)}, разрешено максимум 2."
-        )
+        errors.append(f"[{filename}] Слишком много заголовков первого уровня '#': найдено {len(h1_headers)}, разрешено максимум 2.")
 
     links = re.findall(r"!?\[.*?\]\((.*?)\)", clean_body)
     wiki_links = re.findall(r"!?\[\[(.*?)\]\]", clean_body)
 
     for raw_link in links:
         target = raw_link.strip().split()[0].strip("<>")
-        if (
-            target.startswith("file://")
-            or re.match(r"^[a-zA-Z]:[/\\]", target)
-            or re.match(r"^/(Users|home|root|tmp)/", target)
-            or target.startswith(r"\\")
-        ):
-            errors.append(
-                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
-            )
+        if target.startswith("file://") or re.match(r"^[a-zA-Z]:[/\\]", target) or re.match(r"^/(Users|home|root|tmp)/", target) or target.startswith(r"\\"):
+            errors.append(f"[{filename}] Обнаружен локальный абсолютный путь '{target}'.")
 
     for raw_link in wiki_links:
         target = raw_link.strip().split("|")[0].strip()
-        if (
-            target.startswith("file://")
-            or re.match(r"^[a-zA-Z]:[/\\]", target)
-            or re.match(r"^/(Users|home|root|tmp)/", target)
-            or target.startswith(r"\\")
-        ):
-            errors.append(
-                f"[{filename}] Обнаружен локальный абсолютный путь '{target}'."
-            )
+        if target.startswith("file://") or re.match(r"^[a-zA-Z]:[/\\]", target) or re.match(r"^/(Users|home|root|tmp)/", target) or target.startswith(r"\\"):
+            errors.append(f"[{filename}] Обнаружен локальный абсолютный путь '{target}'.")
 
     body_tags = re.findall(r"(?<!\S)#[a-zA-Zа-яА-Я0-9_/-]+", clean_body)
     for tag in body_tags:
         if tag.lower() not in ALLOWED_BODY_TAGS:
-            errors.append(
-                f"[{filename}] Запрещенный тег '{tag}' в тексте. В теле документа разрешены только: {', '.join(ALLOWED_BODY_TAGS)}."
-            )
+            errors.append(f"[{filename}] Запрещенный тег '{tag}' в тексте. Разрешены только: {', '.join(ALLOWED_BODY_TAGS)}.")
 
     return errors, warnings
 
