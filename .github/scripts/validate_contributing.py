@@ -12,6 +12,7 @@ ALLOWED_EXTENSIONS = {".md", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", "
 MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".avif"}
 
 IGNORE_DIRS = {".github", ".git", ".obsidian", ".venv", "venv"}
+IGNORE_FILES = {"readme.md"}
 
 MAX_FILE_SIZE_MB = 10
 WARNING_FILES = [".gitignore", "contributing.md"]
@@ -51,6 +52,10 @@ def check_file(filepath):
         return errors, warnings
 
     filename = os.path.basename(filepath)
+    
+    if filename.lower() in IGNORE_FILES:
+        return errors, warnings
+
     ext = os.path.splitext(filename)[1].lower()
 
     file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
