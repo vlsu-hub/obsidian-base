@@ -24,17 +24,29 @@ if [ -f "$NOTES_DIR/.github/quartz/custom.scss" ]; then
     cat "$NOTES_DIR/.github/quartz/custom.scss" >> "$QUARTZ_DIR/quartz/styles/custom.scss"
 fi
 
-echo "Step 4/5: Copying notes..."
+echo "Step 4/5: Copying notes and meta-files..."
+
 find "$NOTES_DIR" -maxdepth 1 -type d -name "*семестр*" -exec cp -r {} "$QUARTZ_DIR/content/" \;
+
+if [ -f "$NOTES_DIR/index.md" ]; then
+    cp "$NOTES_DIR/index.md" "$QUARTZ_DIR/content/index.md"
+else
+    echo "Warning: index.md not found in the root. Site homepage will be empty."
+fi
+
 if [ -f "$NOTES_DIR/README.md" ]; then
-    cp "$NOTES_DIR/README.md" "$QUARTZ_DIR/content/index.md"
+    cp "$NOTES_DIR/README.md" "$QUARTZ_DIR/content/readme.md"
+fi
+
+if [ -f "$NOTES_DIR/CONTRIBUTING.md" ]; then
+    cp "$NOTES_DIR/CONTRIBUTING.md" "$QUARTZ_DIR/content/contributing.md"
 fi
 
 echo "Step 5/5: Generating index.md metadata..."
 find "$QUARTZ_DIR/content" -mindepth 1 -type d | while read -r dir; do
     foldername=$(basename "$dir")
     index_file="$dir/index.md"
-    
+
     if [ ! -f "$index_file" ]; then
         cat <<EOF > "$index_file"
 ---
