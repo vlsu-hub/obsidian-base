@@ -7,7 +7,6 @@ export const sharedPageComponents: SharedLayout = {
   afterBody: [],
   footer: Component.Footer({
     links: {
-      "Главная страница": "https://vlsu-hub.org",
       Telegram: "https://t.me/the_nataraja",
       GitHub: "https://github.com/vlsu-hub/obsidian-base",
     },
@@ -24,14 +23,22 @@ export const defaultContentPageLayout: PageLayout = {
   left: [
     Component.PageTitle(),
     Component.MobileOnly(Component.Spacer()),
-    Component.Search(),
-    Component.Darkmode(),
-    Component.ReaderMode(),
+    Component.Flex({
+      components: [
+        {
+          Component: Component.Search(),
+          grow: true,
+        },
+        { Component: Component.Darkmode() },
+        { Component: Component.ReaderMode() },
+      ],
+    }),
     Component.Explorer({
       title: "Навигация",
       useSavedState: true,
-      folderClickBehavior: "collapse",
+      folderClickBehavior: "link",
       folderDefaultState: "collapsed",
+      filterFn: (node) => node.slugSegment !== "tags" && node.slugSegment !== "attachments",
     }),
   ],
   right: [
@@ -52,14 +59,22 @@ export const defaultListPageLayout: PageLayout = {
   left: [
     Component.PageTitle(),
     Component.MobileOnly(Component.Spacer()),
-    Component.Search(),
-    Component.Darkmode(),
-    Component.ReaderMode(),
+    Component.Flex({
+      components: [
+        {
+          Component: Component.Search(),
+          grow: true,
+        },
+        { Component: Component.Darkmode() },
+        { Component: Component.ReaderMode() },
+      ],
+    }),
     Component.Explorer({
       title: "Навигация",
       useSavedState: true,
-      folderClickBehavior: "collapse",
+      folderClickBehavior: "link",
       folderDefaultState: "collapsed",
+      filterFn: (node) => node.slugSegment !== "tags" && node.slugSegment !== "attachments",
     }),
   ],
   right: [],

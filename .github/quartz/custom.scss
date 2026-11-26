@@ -1,15 +1,135 @@
-ul.section-ul ul.tags a {  
+.page-title a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.page-title a::before {
+  content: "";
+  display: inline-block;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  background-color: var(--dark);
+  -webkit-mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiB2aWV3Qm94PSIwIDAgMTYgMTYiPgogIDxwYXRoIGQ9Ik0xIDBIMlYzSDFaTTE0IDBIMTVWM0gxNFpNNSAxSDZWNUg1VjZIMTFWNUgxMFYxSDExVjNIMTJWMkgxM1YzSDE0VjRIMTJWN0gxNVY4SDE0VjlIMTJWMTJIMTFWMTRIMTBWMTVIOVYxNkg3VjE1SDZWMTRINVYxMkg0VjlIMlY4SDFWN0g0VjRIMlYzSDNWMkg0VjNINVpNNiAxMEg1VjExSDZaTTExIDEwSDEwVjExSDExWk03IDEzVjE0SDlWMTNaIiBmaWxsPSIjMDAwMDAwIi8+Cjwvc3ZnPgo=") no-repeat center / contain;
+  mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiB2aWV3Qm94PSIwIDAgMTYgMTYiPgogIDxwYXRoIGQ9Ik0xIDBIMlYzSDFaTTE0IDBIMTVWM0gxNFpNNSAxSDZWNUg1VjZIMTFWNUgxMFYxSDExVjNIMTJWMkgxM1YzSDE0VjRIMTJWN0gxNVY4SDE0VjlIMTJWMTJIMTFWMTRIMTBWMTVIOVYxNkg3VjE1SDZWMTRINVYxMkg0VjlIMlY4SDFWN0g0VjRIMlYzSDNWMkg0VjNINVpNNiAxMEg1VjExSDZaTTExIDEwSDEwVjExSDExWk03IDEzVjE0SDlWMTNaIiBmaWxsPSIjMDAwMDAwIi8+Cjwvc3ZnPgo=") no-repeat center / contain;
+}
+
+ul.section-ul ul.tags a {
   padding: 0.05rem 0.3rem !important;
   opacity: 0.45 !important;
   max-width: 140px !important;
-  
   white-space: nowrap !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important; 
+  text-overflow: ellipsis !important;
   display: inline-block !important;
   vertical-align: middle !important;
+  transition: opacity 0.15s ease;
 }
 
 ul.section-ul ul.tags a:hover {
-  opacity: 1 !important; 
+  opacity: 1 !important;
+}
+
+article {
+  line-height: 1.65;
+
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+
+  img {
+    border-radius: 8px;
+    border: 1px solid var(--lightgray);
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    background-color: var(--lightgray);
+    font-weight: 600;
+  }
+
+  th, td {
+    border: 1px solid var(--lightgray);
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+.graph > .graph-outer {
+  border-radius: 8px;
+}
+
+div.popover-hint:has(> .page-listing) {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1.5rem;
+}
+
+footer::before {
+  content: "Здесь живут олени... 🦌 · © 2026";
+  display: block;
+  margin-bottom: 0.6rem;
+  color: var(--darkgray);
+}
+
+.page-title::after {
+  content: "Шучу, просто большая мусорка.";
+  display: block;
+  font-family: var(--bodyFont);
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--darkgray);
+  opacity: 0.7;
+  margin-top: 0.35rem;
+}
+
+@media all and (max-width: 800px) {
+  .page-title::after {
+    display: none;
+  }
+}
+
+footer > p {
+  display: none;
+}
+
+footer ul {
+  margin-top: 0 !important;
+}
+
+// чтоб на телефоне формулы не ломались (хз работает ли)
+mjx-container[display="true"] {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 0.25rem 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+// удобнее нажимать на стрелочку раскрытия папки
+.explorer-ul .folder-icon {
+  padding: 0.25rem;
+  margin: -0.25rem 0.15rem -0.25rem -0.25rem;
+}
+
+// заметнее выделяем открытую сейчас страницу в навигации
+.explorer-ul a.active {
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+:root[saved-theme="dark"] article img {
+  filter: brightness(0.88);
+  transition: filter 0.2s ease;
+
+  &:hover {
+    filter: brightness(1);
+  }
 }

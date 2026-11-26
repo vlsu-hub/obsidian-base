@@ -19,6 +19,9 @@ if [ -f "$NOTES_DIR/.github/quartz/custom.scss" ]; then
     echo "" >> "$QUARTZ_DIR/quartz/styles/custom.scss"
     cat "$NOTES_DIR/.github/quartz/custom.scss" >> "$QUARTZ_DIR/quartz/styles/custom.scss"
 fi
+if [ -f "$NOTES_DIR/.github/quartz/icon.png" ]; then
+    cp "$NOTES_DIR/.github/quartz/icon.png" "$QUARTZ_DIR/quartz/static/icon.png"
+fi
 
 echo "Step 3/4: Copying notes and meta-files..."
 
@@ -43,7 +46,7 @@ find "$QUARTZ_DIR/content" -type f -name "_index.md" -print0 | while IFS= read -
 done
 
 echo "Step 4/4: Generating index.md metadata..."
-find "$QUARTZ_DIR/content" -mindepth 1 -type d | while read -r dir; do
+find "$QUARTZ_DIR/content" -mindepth 1 -type d ! -name "attachments" ! -path "*/attachments/*" | while read -r dir; do
     foldername=$(basename "$dir")
     index_file="$dir/index.md"
 
