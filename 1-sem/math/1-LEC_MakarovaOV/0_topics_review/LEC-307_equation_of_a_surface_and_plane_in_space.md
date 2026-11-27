@@ -164,9 +164,13 @@ x - 1 & y & z - 2 \\
 
 Разложение по первой строке даёт:
 
-$$(x - 1)\begin{vmatrix} 1 & -2 \\ 3 & -1 \end{vmatrix} - y\begin{vmatrix} 1 & -2 \\ -1 & -1 \end{vmatrix} + (z - 2)\begin{vmatrix} 1 & 1 \\ -1 & 3 \end{vmatrix} = 0,$$
+$$
+(x - 1)\begin{vmatrix} 1 & -2 \\ 3 & -1 \end{vmatrix} - y\begin{vmatrix} 1 & -2 \\ -1 & -1 \end{vmatrix} + (z - 2)\begin{vmatrix} 1 & 1 \\ -1 & 3 \end{vmatrix} = 0,
+$$
 
-$$5(x - 1) + 3y + 4(z - 2) = 0 \iff 5x + 3y + 4z - 13 = 0.$$
+$$
+5(x - 1) + 3y + 4(z - 2) = 0 \iff 5x + 3y + 4z - 13 = 0.
+$$
 
 ### Уравнение плоскости в отрезках
 
@@ -375,7 +379,12 @@ $$d(M_1, \pi) = \left|\text{пр}_{\vec{n}}\,\overrightarrow{M_0 M_1}\right| = \
 </svg>
 
 Вычислим скалярное произведение в числителе:
-$$\vec{n} \cdot \overrightarrow{M_0 M_1} = A(x_1 - x_0) + B(y_1 - y_0) + C(z_1 - z_0) = Ax_1 + By_1 + Cz_1 - (Ax_0 + By_0 + Cz_0) = Ax_1 + By_1 + Cz_1 + D.$$
+$$
+\begin{aligned}
+\vec{n} \cdot \overrightarrow{M_0 M_1} &= A(x_1 - x_0) + B(y_1 - y_0) + C(z_1 - z_0) \\
+&= Ax_1 + By_1 + Cz_1 - (Ax_0 + By_0 + Cz_0)
+\end{aligned}
+$$
 Подставляя длину нормали $|\vec{n}| = \sqrt{A^2 + B^2 + C^2}$, получаем **формулу расстояния от точки до плоскости**:
 $$d(M_1, \pi) = \frac{|Ax_1 + By_1 + Cz_1 + D|}{\sqrt{A^2 + B^2 + C^2}}.$$
 

@@ -4,6 +4,11 @@
   gap: 0.55rem;
 }
 
+#quartz-body .center {
+  min-width: 0;
+}
+
+
 .page-title a::before {
   content: "";
   display: inline-block;
@@ -104,9 +109,21 @@ footer ul {
 
 // чтоб на телефоне формулы не ломались (хз работает ли)
 mjx-container[display="true"] {
+  display: block;
   overflow-x: auto;
   max-width: 100%;
-  padding: 0.25rem 0;
+  padding: 0.6rem 0.25rem;
+  margin: 1rem 0;
+  font-size: 1.08rem;
+  scrollbar-width: thin;
+
+  background-color: var(--highlight);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+
+  > svg {
+    max-width: none !important;
+  }
 }
 
 html {
