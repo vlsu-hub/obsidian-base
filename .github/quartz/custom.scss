@@ -68,7 +68,7 @@ table {
   border-radius: 8px;
 }
 
-div.popover-hint:has(> .page-listing) {
+div.popover-hint:has(.desc-bottom):has(> .page-listing) {
   display: flex;
   flex-direction: column-reverse;
   gap: 1.5rem;
@@ -149,4 +149,8 @@ html {
   &:hover {
     filter: brightness(1);
   }
+}
+
+body:not([data-slug^="tags"]) .page-listing > p {
+  display: none;
 }
